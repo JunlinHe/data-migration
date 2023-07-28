@@ -1,0 +1,78 @@
+version: '3.8'
+services:
+  svc-mysql:
+    image: mysql:5.7.38
+    ports:
+      - "3306:3306"
+    volumes:
+      - vol-mysql:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PWD}
+    networks:
+      - net-base
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-P3306", "-uroot", "-p${MYSQL_ROOT_PWD}" ]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+
+  svc-flyway-init:
+    image: ${BASE_REGISTRY}/${BASE_PROJECT}/flyway:${BASE_TAG}
+    command: migrate
+    environment:
+      - FLYWAY_URL=jdbc:mysql://svc-mysql:3306
+      - FLYWAY_SCHEMAS=mysql
+      - FLYWAY_USER=root
+      - FLYWAY_PASSWORD=${MYSQL_ROOT_PWD}
+      - FLYWAY_CONNECT_RETRIES=60
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+      - FLYWAY_CLEAN_DISABLED=true
+      - FLYWAY_LOCATIONS=filesystem:sql/init
+      - FLYWAY_PLACEHOLDERS_MYSQL_USER=${MYSQL_USER}
+      - FLYWAY_PLACEHOLDERS_MYSQL_PWD=${MYSQL_PWD}
+    networks:
+      - net-base
+    depends_on:
+      - svc-mysql
+
+  svc-flyway-base:
+    image: ${BASE_REGISTRY}/${BASE_PROJECT}/flyway:${BASE_TAG}
+    command: migrate
+    environment:
+      - FLYWAY_URL=jdbc:mysql://svc-mysql:3306
+      - FLYWAY_SCHEMAS=db_homing_base
+      - FLYWAY_USER=${MYSQL_USER}
+      - FLYWAY_PASSWORD=${MYSQL_PWD}
+      - FLYWAY_CONNECT_RETRIES=60
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+      - FLYWAY_CLEAN_DISABLED=true
+      - FLYWAY_LOCATIONS=filesystem:sql/base
+    networks:
+      - net-base
+    depends_on:
+      - svc-flyway-init
+
+  svc-flyway-def:
+    image: ${BASE_REGISTRY}/${BASE_PROJECT}/flyway:${BASE_TAG}
+    command: migrate
+    environment:
+      - FLYWAY_URL=jdbc:mysql://svc-mysql:3306
+      - FLYWAY_SCHEMAS=db_homing_def
+      - FLYWAY_USER=${MYSQL_USER}
+      - FLYWAY_PASSWORD=${MYSQL_PWD}
+      - FLYWAY_CONNECT_RETRIES=60
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+      - FLYWAY_CLEAN_DISABLED=true
+      - FLYWAY_LOCATIONS=filesystem:sql/def
+    networks:
+      - net-base
+    depends_on:
+      - svc-flyway-init
+
+volumes:
+  vol-mysql:
+
+networks:
+  net-base:
