@@ -79,9 +79,44 @@ flyway社区版本提供了多种方式来执行SQL脚本，包括:
 
 - 脚本目录为sql，子目录名应与数据库同名
 - 脚本文件命名规范：V大写，后面跟数字作为版本号，按时间戳命名，后面跟双下划线，再后面是脚本名，示例：V202309221000__feature-1.sql
-- 旧版sql脚本原则上不允许修改
+- 脚本文件命名不符合规范的会被自动忽略
+- 旧版sql脚本原则上不允许修改，实在要改也行，在命令行输出的日志中获取被修改的旧版sql脚本的checksum，然后手动修改`flyway_schema_version`中的checksum，并手动执行被修改的部分sql
 - 新版本脚本执行失败时，会抛出异常，并会在`flyway_schema_history`记录失败信息，下次容器启动前需要删除该条记录
 
-# TODO
+### flyway 命令
 
-- 补充Jenkinsfile、k8s.yaml
+- baseline
+
+不论是新项目还是旧项目，都可以接入flyway，你可以把当前的数据库脚本整理为基线版本`V1__init.sql`，执行`baseline`命令，flyway会自动创建flyway_schema_version表并记录命令的执行情况
+
+```shell
+flyway -url=jdbc:mysql://localhost:3306/my-db
+       -user=root 
+       -password=postgres 
+       -baselineVersion=1 
+       -baselineDescription=init 
+       baseline
+```
+
+注意，命令参数`-baselineDescription`值应与基线版本脚本描述`init`一致
+
+- migrate
+
+migrate是flyway的核心命令，用于执行sql迁移任务。实际上，当你配置了环境变量参数`FLYWAY_BASELINE_ON_MIGRATE=true`时，它会像`baseline`命令一样，自动创建`flyway_schema_version`表并使用最小版本的sql文件作为基线版本，所以在执行旧项目改造时，不需要手动执行`baseline`命令，仅需要整理好`V1__init.sql`即可
+
+# 执行数据迁移
+
+## 演示
+
+> 你需要在linux环境中执行演示脚本，它将安装docker，并使用docker-compose运行flyway数据迁移示例
+
+```shell
+cd script/quickstart && \ 
+sudo sh run.sh init && \ 
+sudo sh run.sh up
+```
+
+## CI/CD
+
+- 将`script/Jenkinsfile`导入你的持续集成构建计划中
+- 将`k8s.yaml`导入你的持续部署流程中

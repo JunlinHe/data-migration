@@ -1,0 +1,70 @@
+pipeline {
+  agent any
+  stages {
+    stage('参数校验') {
+      steps {
+        script {
+          if(env.PROJECT_PATH == ''){
+            error 'PROJECT_PATH不能为空'
+            return
+          }
+        }
+
+      }
+    }
+
+    stage('代码检出') {
+      steps {
+        checkout([
+          $class: "GitSCM",
+          branches: [[name: env.GIT_BUILD_REF]],
+          userRemoteConfigs: [[
+            url: env.GIT_REPO_URL,
+            credentialsId: env.CREDENTIALS_ID
+          ]]])
+        }
+      }
+
+      stage('生成镜像版本号') {
+        steps {
+          script {
+            PROJECT_VERSION = sh(script: 'cat version', returnStdout: true)
+            echo "工程版本：${PROJECT_VERSION}"
+
+            if (env.DEPLOY_PJ_VERSION == '1.0.0-SNAPSHOT_0') {
+              DEPLOY_PJ_VERSION = PROJECT_VERSION + '_' + CI_BUILD_NUMBER
+            }
+
+            echo "镜像版本：$DEPLOY_PJ_VERSION"
+          }
+
+        }
+      }
+
+      stage('镜像构建') {
+        steps {
+          script {
+            echo "入参${PROJECT_PATH}..."
+            docker.withRegistry('https://your-host', "${DOCKER_CRED}") {
+              echo "构建基础镜像要使用下面两条命令"
+              echo "sh 'docker tag flyway/flyway:7.15.0-alpine your-host/public-repository/testsl/flyway:7.15.0-alpine'"
+              echo "sh 'docker push your-host/public-repository/testsl/flyway:7.15.0-alpine'"
+
+              BASE_FLYWAY_IMG=sh(script: 'your-host/public-repository/testsl/your-prefix-flyway:$DEPLOY_PJ_VERSION', returnStdout: true)
+              sh "rm -rf app/flyway/sql"
+              sh "cp -r ../sql app/flyway"
+              sh "docker build --build-arg FROM_IMG ${FROM_IMG} -t ${BASE_FLYWAY_IMG} -f app/flyway/Dockerfile app/flyway"
+              sh "rm -rf app/flyway/sql"
+              sh "docker push ${BASE_FLYWAY_IMG}"
+            }
+          }
+
+        }
+      }
+
+    }
+    environment {
+      PROJECT_VERSION = ''
+      FROM_IMG = 'your-host/public-repository/testsl/flyway:7.15.0-alpine'
+    }
+  }

@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-migration-init
+spec:
+  template:
+    metadata:
+      name: data-migration-init
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: data-migration-init
+          image: your-repository/xxx-sql-migration:your-tag
+          command: ["sh", "-c", "/usr/local/bin/flyway migrate"]
+          env:
+            - name: FLYWAY_URL
+              value: "jdbc:mysql://svc-mysql:3306"
+            - name: FLYWAY_SCHEMAS
+              value: mysql
+            - name: FLYWAY_USER
+              value: root
+            - name: FLYWAY_PASSWORD
+              value: 123 # 可以从 ConfigMap 和 Secret 中加载
+            - name: FLYWAY_CONNECT_RETRIES
+              value: 10
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: true
+            - name: FLYWAY_CLEAN_DISABLED
+              value: true
+            - name: FLYWAY_LOCATIONS
+              value: sql/init
+            - name: FLYWAY_PLACEHOLDERS_MYSQL_USER
+              value: homing
+            - name: FLYWAY_PLACEHOLDERS_MYSQL_PWD
+              value: homing
+      containers:
+        - name: data-migration-base
+          image: your-repository/xxx-sql-migration:your-tag
+          command: ["sh", "-c", "/usr/local/bin/flyway migrate"]
+          env:
+            - name: FLYWAY_URL
+              value: "jdbc:mysql://svc-mysql:3306"
+            - name: FLYWAY_SCHEMAS
+              value: db_homing_base
+            - name: FLYWAY_USER
+              value: homing
+            - name: FLYWAY_PASSWORD
+              value: homing # 可以从 ConfigMap 和 Secret 中加载
+            - name: FLYWAY_CONNECT_RETRIES
+              value: 10
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: true
+            - name: FLYWAY_CLEAN_DISABLED
+              value: true
+            - name: FLYWAY_LOCATIONS
+              value: sql/base
+        - name: data-migration-def
+          image: your-repository/xxx-sql-migration:your-tag
+          command: ["sh", "-c", "/usr/local/bin/flyway migrate"]
+          env:
+            - name: FLYWAY_URL
+              value: "jdbc:mysql://svc-mysql:3306"
+            - name: FLYWAY_SCHEMAS
+              value: db_homing_def
+            - name: FLYWAY_USER
+              value: homing
+            - name: FLYWAY_PASSWORD
+              value: homing # 可以从 ConfigMap 和 Secret 中加载
+            - name: FLYWAY_CONNECT_RETRIES
+              value: 10
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: true
+            - name: FLYWAY_CLEAN_DISABLED
+              value: true
+            - name: FLYWAY_LOCATIONS
+              value: sql/def
